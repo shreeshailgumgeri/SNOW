@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update sys_domain="global" table="sys_script">
+    <sys_script action="INSERT_OR_UPDATE">
+        <abort_action>false</abort_action>
+        <access>package_private</access>
+        <action_delete>true</action_delete>
+        <action_insert>true</action_insert>
+        <action_query>false</action_query>
+        <action_update>true</action_update>
+        <active>true</active>
+        <add_message>false</add_message>
+        <advanced>true</advanced>
+        <change_fields>false</change_fields>
+        <client_callable>false</client_callable>
+        <collection>x_209235_f5_as3_applications</collection>
+        <condition/>
+        <description/>
+        <execute_function>false</execute_function>
+        <filter_condition/>
+        <is_rest>false</is_rest>
+        <message/>
+        <name>processAS3Change</name>
+        <order>100</order>
+        <priority>100</priority>
+        <rest_method/>
+        <rest_method_text/>
+        <rest_service/>
+        <rest_service_text/>
+        <rest_variables/>
+        <role_conditions/>
+        <script><![CDATA[(function executeRule(current, previous /*null when async*/) {
+	var f5App = new f5AppHelper();
+	var appData = JSON.parse(current.getValue('app_data'));
+	var operation = current.operation();
+	
+	// Implement circular logic prevention for updates.  Record will be updated by the 
+	// AS3ApiAction script when AS3 declaration is pushed.  Return if rec update
+	// is not an admin approval or change to the app_data field
+	if ( operation == "update" &&
+		!( current.app_data.changes() || 
+		  current.pending_action.changesFrom("none") ||
+		  current.approval.changesTo("approved") )
+	   ) { gs.info("processAS3Change CALLED BUT RETURNED "); return; }
+	
+	gs.info("processAS3Change CALLED " + current.operation());
+	// Process Record Operations
+	if (operation == "insert") {
+		current.pending_action = "create";
+		appData.action = 'deploy';
+		// Inject ServiceNow record number for AS3 ID field
+		appData.id = current.getValue('number');
+		
+	} else if (operation == "update") {
+		// initiate verifed remove if record is updated will pending_action delete
+		if (current.pending_action == "delete") {
+			appData.action = 'remove';
+		} else if (current.pending_action == "create") {
+			appData.action = 'deploy';
+		} else { 
+			current.pending_action = "update"; 
+			appData.action = 'deploy';
+		}
+	} else if (operation == "delete") {
+		current.pending_action = "delete";
+		appData.action = 'remove';
+	} else { 
+		current.pending_action = "none";
+		return; 
+	}
+	
+	// Populate attribute values that require scripted executions
+	var scriptedAttrs = f5App.getScriptedAttrs(appData.template);
+	for (var i = 0; i < scriptedAttrs.length; i++) {
+		var scriptName = scriptedAttrs[i].scriptName;
+		var templateId = scriptedAttrs[i].templateId;
+		appData[templateId] = f5App.execScriptedAttr(scriptName, operation, appData);
+	}
+	
+	// Save appData into record 
+	current.app_data = JSON.stringify(appData);
+	
+	// Generate AS3 Declaration 
+	var template = f5App.getTemplate(appData.template);
+	for (var key in appData) {
+		if (appData.hasOwnProperty(key)) {
+			var re = new RegExp("{{" + key + "}}", "g");
+			if (typeof appData[key] === "string") {
+				template = template.replace(re, appData[key]);
+			} else if (appData[key].constructor === Array || typeof(appData[key]) === "boolean") {
+				template = template.replace(re, JSON.stringify(appData[key]));
+			}
+		}
+	}
+	current.as3_declaration = template;
+	
+	// Validate the AS3 declaration as JSON
+	try {
+		var tmplObj = JSON.parse(template);
+		
+		// AS3 currently does not allow for empty arrays or arrays with a single object of "none"
+		//  Because of this we need to remove any json attribute that meets the above conditions
+		var removeKeys = function(obj) {
+			for (var prop in obj) {
+				if(obj.hasOwnProperty(prop) && typeof(obj[prop]) == 'object'){
+					if (obj[prop].constructor === Array) {
+						if (obj[prop].length < 1) { 
+							delete obj[prop]; 
+						}
+						else if (String(obj[prop][0]).toLowerCase() == "none") { 
+							delete obj[prop];
+						}
+					} else {
+						removeKeys(obj[prop]);
+					}
+				}
+			}
+		};
+		removeKeys(tmplObj);
+				
+		current.as3_declaration = JSON.stringify(tmplObj);
+	}
+	catch(err) {
+		current.status = "failed";
+		current.api_response = "No API call attempted.  " + 
+			"Invalid JSON detected in AS3 declaration: " + err; 
+		return;
+	}
+	
+	// Set approval value based on cluster deploy method setting and raise admin email
+	//  notification event 
+	var cluster = f5App.getCluster(appData.dsc);
+	
+	var  raiseAS3Event = false;
+	if (operation == "update" || operation == "insert") {
+	
+		if ((cluster.requires_approval == "1" && current.approval.changesTo('approved')) ||
+			 cluster.requires_approval == "0" ) {
+			current.approval = "approved";
+			raiseAS3Event = true;
+		} else {
+			current.approval = "pending";
+			gs.eventQueue(f5App.approvalNotifyEvent, current, f5App.getAdminEmail(), null);
+		}
+	} else if (operation == "delete") {
+		raiseAS3Event = true;
+	}
+	
+	// Raise AS3 Change Event for API handler
+	if (raiseAS3Event) {
+		var data = JSON.stringify({
+			app_data: JSON.parse(current.getValue('app_data')),
+			as3_definition: current.getValue('as3_declaration'),
+			pending_action: current.getValue('pending_action'),
+			number: current.getValue('number'),
+			business_unit: current.getValue('business_unit')
+		});
+		gs.eventQueue(f5App.AS3ChangeEvent, null, current.number, data);
+	}
+	
+// 	if (cluster.requires_approval == "1" && current.approval != "approved" && operation != "delete") {
+// 		current.approval = "pending";
+// 		gs.eventQueue(f5App.approvalNotifyEvent, current, f5App.getAdminEmail(), null);
+// 	} else {
+// 		current.approval = "approved";
+// 	}
+	
+// 	// Raise AS3 Change Event for API handler
+// 	if (((operation == "update" || operation == "insert") && current.getValue('approval') == "approved")
+// 		|| (operation == "delete" &&  current.getValue('status') == 'deployed')) {
+// 		var data = JSON.stringify({
+// 			app_data: JSON.parse(current.getValue('app_data')),
+// 			as3_declaration: JSON.parse(current.getValue('as3_declaration')),
+// 			pending_action: current.getValue('pending_action'),
+// 			number: current.getValue('number')
+// 		});
+// 		gs.eventQueue(f5App.AS3ChangeEvent, null, current.number, data);
+//	}
+})(current, previous);]]></script>
+        <sys_class_name>sys_script</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2018-11-07 20:16:25</sys_created_on>
+        <sys_domain>global</sys_domain>
+        <sys_domain_path>/</sys_domain_path>
+        <sys_id>9e82300b37a1230040a1ae7873990ef1</sys_id>
+        <sys_mod_count>95</sys_mod_count>
+        <sys_name>processAS3Change</sys_name>
+        <sys_overrides/>
+        <sys_package display_value="F5_AS3" source="x_209235_f5_as3">00ecd5513701230040a1ae7873990e4e</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="F5_AS3">00ecd5513701230040a1ae7873990e4e</sys_scope>
+        <sys_update_name>sys_script_9e82300b37a1230040a1ae7873990ef1</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2019-01-07 21:15:07</sys_updated_on>
+        <template/>
+        <when>before</when>
+    </sys_script>
+    <sys_translated_text action="delete_multiple" query="documentkey=9e82300b37a1230040a1ae7873990ef1"/>
+</record_update>

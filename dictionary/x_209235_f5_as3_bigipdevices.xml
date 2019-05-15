@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<database>
+    <element label="bigIpDevices" max_length="40" name="x_209235_f5_as3_bigipdevices" type="collection">
+        <element choice="1" label="Cluster" mandatory="true" max_length="40" name="cluster" type="choice">
+            <choice/>
+        </element>
+        <element label="Management IP" mandatory="true" max_length="40" name="management_ip" type="ip_addr"/>
+        <element label="Name" mandatory="true" max_length="40" name="name" type="string"/>
+        <element attributes="ignore_filter_on_new=true" default="javascript:global.getNextObjNumberPadded();" label="Number" max_length="40" name="number" type="string"/>
+        <element label="Password" mandatory="true" max_length="255" name="password" type="password2"/>
+        <element default="443" label="Port" max_length="40" name="port" type="integer"/>
+        <element label="Username" mandatory="true" max_length="40" name="username" type="string"/>
+    </element>
+</database>

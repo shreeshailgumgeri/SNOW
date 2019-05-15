@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_209235_f5_as3.f5AppHelper</api_name>
+        <client_callable>false</client_callable>
+        <description/>
+        <name>f5AppHelper</name>
+        <script><![CDATA[var f5AppHelper = Class.create();
+f5AppHelper.prototype = {
+    initialize: function() {
+		this.clusterTable = 'x_209235_f5_as3_bigipcluster';
+		this.deviceTable = 'x_209235_f5_as3_bigipdevices';
+		this.applicationTable = 'x_209235_f5_as3_applications';
+		this.templateTable = 'x_209235_f5_as3_as3templates';
+		this.f5AdminRole = 'x_209235_f5_as3.admin';
+		this.AS3ChangeEvent = 'x_209235_f5_as3.AS3Change';
+		this.approvalNotifyEvent = 'x_209235_f5_as3.sendApprovalNotification';
+		this.adminEmailProp = 'x_209235_f5_as3.adminEmailAlias';
+		this.AS3TmplParentProp = 'x_209235_f5_as3.as3TmplParent';
+	},
+	getAdminEmail: function() {
+		return gs.getProperty(this.adminEmailProp);
+	},
+	getAS3TmplParent: function() {
+		return gs.getProperty(this.AS3TmplParentProp);
+	},
+	getMidServers: function() {
+		var gr = new GlideRecord('ecc_agent');
+		gr.query();
+		
+		var midServList = [];
+		while (gr.next()) {
+			midServList.push({
+				name: gr.getValue('name'),
+			});
+		}
+		return midServList;
+	},
+	getUserBusUnit: function() {
+		var gr = new GlideRecord('sys_user');
+		gr.get(gs.getUserID());
+		return gr.department.getDisplayValue();
+	},
+	getScriptedAttrs: function(number) {
+		var gr = new GlideRecord(this.templateTable);
+		gr.addQuery('number', number);
+		gr.query();
+		
+		var scriptedAttrs = [];
+		if (gr.next()) {
+			var uiSpec = JSON.parse(gr.getValue('ui_specification'));
+			for (var i = 0; i < uiSpec.sections.length; i++) {
+				var sect = uiSpec.sections[i];
+				for (var j = 0; j < sect.attributes.length; j++) {
+					var attr = sect.attributes[j];
+					if(attr.inputType == "script") {
+                        scriptedAttrs.push({ templateId: attr.templateId, scriptName: attr.scriptName});
+                    }
+				}
+			}
+		}
+		return scriptedAttrs;
+	},
+	execScriptedAttr: function(scriptName, operation, appData) {
+		var result = "";
+		var gr = new GlideRecord('x_209235_f5_as3_integrationscripts');
+		gr.addQuery('name', scriptName);
+		gr.query();
+		if(gr.next()) {	
+			var evaluator = new GlideScopedEvaluator();
+			evaluator.putVariable('scriptName', gr.getValue('name'));
+			evaluator.putVariable('operation', operation);
+			evaluator.putVariable('appData', appData);
+			evaluator.putVariable('result', null);
+			evaluator.evaluateScript(gr, 'script', null);
+			result = evaluator.getVariable('result');
+		}
+		return result;
+	},
+	getAppData: function(number) {
+		var gr = new GlideRecord(this.applicationTable);
+		gr.addQuery('number', number);
+		gr.query();
+		
+		var appData = {};
+		while (gr.next()) {
+			appData = JSON.parse(gr.getValue('app_data'));
+		}
+		//gs.info(appData);
+		return appData;
+	},
+	getApps: function(business_unit) { 		
+		var gr = new GlideRecord(this.applicationTable);
+		
+		// If user is not an admin only show applications current department
+		var currentUser = gs.getUser(); 
+        if (!currentUser.hasRole(this.f5AdminRole)){
+			gr.addQuery('business_unit', this.getUserBusUnit());
+		} 
+		if (business_unit) {
+			gr.addQuery('business_unit', business_unit);
+		}
+		gr.query();
+		
+		var appList = [];
+		while (gr.next()) {
+			appList.push({
+				number: gr.getValue('number'),
+				appData: JSON.parse(gr.getValue('app_data')),
+				as3_definition: gr.getValue('as3_declaration'),
+				approval: gr.getValue('approval'),
+				status: gr.getValue('status'),
+				pending_action: gr.getValue('pending_action')
+			});
+		}
+		return appList;
+	},
+	getCluster: function(number) {
+		var gr = new GlideRecord(this.clusterTable);
+		gr.addQuery('number', number);
+		gr.query();
+		
+		var clData = {};
+		while (gr.next()) {
+			clData.name = gr.getValue('name');
+			clData.number = gr.getValue('number');
+			clData.mid_server = gr.getValue('mid_server');
+			clData.requires_approval = gr.getValue('requires_approval');
+			clData.cluster_change_method = gr.getValue('cluster_change_method');
+			clData.sync_group_name = gr.getValue('sync_group_name');
+		}
+		return clData;
+	},
+	getClusters: function() { 	
+		var gr = new GlideRecord(this.clusterTable);
+		gr.query();
+		
+		var clusterList = [];
+		while (gr.next()) {
+			clusterList.push({
+				name: gr.getValue('name'), 
+				number: gr.getValue('number'),
+				requires_approval: gr.getValue('requires_approval'),
+				mid_server: gr.getValue('mid_server'),
+				cluster_change_method: gr.getValue('cluster_change_method'),
+				sync_group_name: gr.getValue('sync_group_name')
+			});
+		}
+		return clusterList;
+	},
+	getDevicesByCluster: function(clNumber) {
+		var gr = new GlideRecord(this.deviceTable);
+		gr.addQuery('cluster', clNumber);
+		gr.query();
+		
+		var devList = [];
+		while (gr.next()) {
+			devList.push({
+				name: gr.getValue('name'),
+				number: gr.getValue('number'),
+				mgmt_ip: gr.getValue('management_ip'),
+				port: gr.getValue('port'),
+				username: gr.getValue('username'),
+				password: gr.password.getDecryptedValue(),
+				cluster: gr.getValue('cluster')
+			});
+		}
+		return devList;
+	},
+	getTemplates: function() {
+		//gs.info("tmplList Called");
+		var gr = new GlideRecord(this.templateTable);
+		gr.query();
+		
+		var tmplList = [];
+		while (gr.next()) {
+			tmplList.push({
+				name: gr.getValue('name'),
+				number: gr.getValue('number'),
+				ui_spec: JSON.parse(gr.getValue('ui_specification')),
+				template: gr.getValue('template')
+			});
+		}
+		return tmplList;
+	},
+	getTemplate: function(number) {
+		var gr = new GlideRecord(this.templateTable);
+		gr.addQuery('number', number);
+		gr.query();
+		gr.next();
+		var template = gr.template;
+		// Clean Template Tags
+		template = template.replace(/{{\s+/g, '{{');
+		template = template.replace(/\s+}}/g, '}}');
+		return template;
+	},
+	createApp: function(appData) {
+		var gr = new GlideRecord(this.applicationTable);
+		gr.initialize();
+		gr.app_data = JSON.stringify(appData);
+		gr.business_unit = this.getUserBusUnit();
+		gr.pending_action = "create";
+		return gr.insert();
+	},
+	deleteApp: function(number) {
+		var gr = new GlideRecord(this.applicationTable);
+		gr.addQuery('number', number);
+		gr.query();
+		gr.next();
+		gr.pending_action = "delete";
+		return gr.update();
+	},
+	updateApp: function(number, appData) {
+		var gr = new GlideRecord(this.applicationTable);
+		gr.addQuery('number', number);
+		gr.query();
+		gr.next();
+		gr.app_data = JSON.stringify(appData);
+		gr.status = "pending";
+		gr.pending_action = "update";
+		return gr.update();
+	},
+    type: 'f5AppHelper'
+};
+]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2018-10-08 18:23:09</sys_created_on>
+        <sys_id>ce020ad93741230040a1ae7873990e66</sys_id>
+        <sys_mod_count>89</sys_mod_count>
+        <sys_name>f5AppHelper</sys_name>
+        <sys_package display_value="F5_AS3" source="x_209235_f5_as3">00ecd5513701230040a1ae7873990e4e</sys_package>
+        <sys_policy>read</sys_policy>
+        <sys_scope display_value="F5_AS3">00ecd5513701230040a1ae7873990e4e</sys_scope>
+        <sys_update_name>sys_script_include_ce020ad93741230040a1ae7873990e66</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2019-01-07 21:45:15</sys_updated_on>
+    </sys_script_include>
+</record_update>

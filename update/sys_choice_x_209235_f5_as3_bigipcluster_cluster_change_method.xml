@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update>
+    <sys_choice action="INSERT_OR_UPDATE" field="cluster_change_method" table="x_209235_f5_as3_bigipcluster" version="3">
+        <sys_choice action="INSERT_OR_UPDATE">
+            <dependent_value/>
+            <element>cluster_change_method</element>
+            <hint/>
+            <inactive>false</inactive>
+            <label>Active Only, No Sync</label>
+            <language>en</language>
+            <name>x_209235_f5_as3_bigipcluster</name>
+            <sequence>0</sequence>
+            <sys_created_by>admin</sys_created_by>
+            <sys_created_on>2018-11-07 16:25:46</sys_created_on>
+            <sys_domain>global</sys_domain>
+            <sys_domain_path>/</sys_domain_path>
+            <sys_id>05b7884f3721230040a1ae7873990ee6</sys_id>
+            <sys_mod_count>3</sys_mod_count>
+            <sys_updated_by>admin</sys_updated_by>
+            <sys_updated_on>2018-12-22 20:06:34</sys_updated_on>
+            <value>active_no_sync</value>
+        </sys_choice>
+        <sys_choice action="INSERT_OR_UPDATE">
+            <dependent_value/>
+            <element>cluster_change_method</element>
+            <hint/>
+            <inactive>false</inactive>
+            <label>Active Only, Sync to Group</label>
+            <language>en</language>
+            <name>x_209235_f5_as3_bigipcluster</name>
+            <sequence>1</sequence>
+            <sys_created_by>admin</sys_created_by>
+            <sys_created_on>2018-11-07 16:35:14</sys_created_on>
+            <sys_domain>global</sys_domain>
+            <sys_domain_path>/</sys_domain_path>
+            <sys_id>e789888f3721230040a1ae7873990e70</sys_id>
+            <sys_mod_count>1</sys_mod_count>
+            <sys_updated_by>admin</sys_updated_by>
+            <sys_updated_on>2018-11-07 16:35:23</sys_updated_on>
+            <value>active_sync</value>
+        </sys_choice>
+        <sys_choice action="INSERT_OR_UPDATE">
+            <dependent_value/>
+            <element>cluster_change_method</element>
+            <hint/>
+            <inactive>false</inactive>
+            <label>Push All, No Sync</label>
+            <language>en</language>
+            <name>x_209235_f5_as3_bigipcluster</name>
+            <sequence>2</sequence>
+            <sys_created_by>admin</sys_created_by>
+            <sys_created_on>2018-11-07 16:25:46</sys_created_on>
+            <sys_domain>global</sys_domain>
+            <sys_domain_path>/</sys_domain_path>
+            <sys_id>09b7884f3721230040a1ae7873990ee7</sys_id>
+            <sys_mod_count>2</sys_mod_count>
+            <sys_updated_by>admin</sys_updated_by>
+            <sys_updated_on>2018-11-07 16:33:27</sys_updated_on>
+            <value>all_no_sync</value>
+        </sys_choice>
+        <sys_choice_set action="INSERT_OR_UPDATE">
+            <element>cluster_change_method</element>
+            <name>x_209235_f5_as3_bigipcluster</name>
+            <sys_class_name>sys_choice_set</sys_class_name>
+            <sys_created_by>admin</sys_created_by>
+            <sys_created_on>2018-11-07 16:25:46</sys_created_on>
+            <sys_id>56a63db7db562300a29de04a48961936</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_name>cluster_change_method</sys_name>
+            <sys_package display_value="F5_AS3" source="x_209235_f5_as3">00ecd5513701230040a1ae7873990e4e</sys_package>
+            <sys_policy/>
+            <sys_scope display_value="F5_AS3">00ecd5513701230040a1ae7873990e4e</sys_scope>
+            <sys_update_name>sys_choice_x_209235_f5_as3_bigipcluster_cluster_change_method</sys_update_name>
+            <sys_updated_by>admin</sys_updated_by>
+            <sys_updated_on>2018-11-07 16:25:46</sys_updated_on>
+        </sys_choice_set>
+    </sys_choice>
+</record_update>
